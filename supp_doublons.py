@@ -3,7 +3,7 @@ import os
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="Suppression de doublons", layout="centered")
+st.set_page_config(page_title="Suppression de doublons", layout="wide")
 st.title("🧹 Suppression de doublons (XLSX / XLS / CSV)")
 
 uploaded_file = st.file_uploader("Charge un fichier (.xlsx, .xls, .csv)", type=["xlsx", "xls", "csv"])
@@ -166,3 +166,4 @@ if st.button("Supprimer les doublons", type="primary"):
         file_name=out_name,
         mime=mime,
     )
+

@@ -152,7 +152,7 @@ if st.button("Supprimer les doublons", type="primary"):
     base = os.path.splitext(uploaded_file.name)[0]
 
     if ext == ".csv":
-        out = export_csv(df_clean)
+        out = export_csv(df_clean, sep=",")
         out_name = f"{base}_sans_doublons.csv"
         mime = "text/csv"
     else:
@@ -166,4 +166,5 @@ if st.button("Supprimer les doublons", type="primary"):
         file_name=out_name,
         mime=mime,
     )
+
 

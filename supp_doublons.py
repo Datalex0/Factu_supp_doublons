@@ -136,7 +136,7 @@ if trim_strings:
 
 if st.button("Supprimer les doublons", type="primary"):
     before = len(df_work)
-    df_clean = df_work.drop_duplicates(subset=subset, keep=keep)
+    df_clean = df_work.drop_duplicates(subset=subset, keep=keep).reset_index(drop=True)
     after = len(df_clean)
 
     st.success(f"✅ {before - after} doublon(s) supprimé(s).")

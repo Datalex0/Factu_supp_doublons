@@ -9,15 +9,15 @@ st.title("🧹 Suppression de doublons (XLSX / XLS / CSV)")
 uploaded_file = st.file_uploader("Charge un fichier (.xlsx, .xls, .csv)", type=["xlsx", "xls", "csv"])
 
 
-def try_read_csv(uploaded, encoding=None, sep=None):
+def try_read_csv(uploaded, encoding=None, sep="AUTO"):
     uploaded.seek(0)
-    return pd.read_csv(
-        uploaded,
-        encoding=encoding,
-        sep=sep,
-        sep=None if sep == "AUTO" else sep,
-        engine="python" if (sep == "AUTO" or sep is None) else "c",
-    )
+
+    # sep="AUTO" -> pandas essaie de deviner (avec engine="python")
+    if sep == "AUTO" or sep is None:
+        return pd.read_csv(uploaded, encoding=encoding, sep=None, engine="python")
+    else:
+        return pd.read_csv(uploaded, encoding=encoding, sep=sep)
+
 
 
 def read_csv_robust(uploaded):
@@ -160,3 +160,4 @@ if st.button("Supprimer les doublons", type="primary"):
         file_name=out_name,
         mime=mime,
     )
+

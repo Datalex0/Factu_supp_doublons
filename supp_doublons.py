@@ -5,7 +5,7 @@ import streamlit as st
 st.set_page_config(page_title="Suppression de doublons Excel", layout="centered")
 st.title("🧹 Nettoyage Excel — suppression de doublons")
 
-uploaded_file = st.file_uploader("Charge un fichier Excel (.xlsx)", type=["xlsx"])
+uploaded_file = st.file_uploader("Charge un fichier Excel (.xlsx)", type=["xlsx", "xls", "csv"])
 
 if uploaded_file is not None:
     # Lecture de l'Excel (toutes les feuilles)
@@ -78,3 +78,4 @@ if uploaded_file is not None:
         )
 else:
     st.info("Charge un fichier Excel pour commencer.")
+

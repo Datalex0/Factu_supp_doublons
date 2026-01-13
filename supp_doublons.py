@@ -61,9 +61,9 @@ def export_excel_single_sheet(df, sheet_name="Sheet1"):
     return output
 
 
-def export_csv(df, sep=";"):
+def export_csv(df, sep=","):
     # UTF-8 avec BOM pour ouverture clean dans Excel
-    csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+    csv_bytes = df.to_csv(index=False, sep=sep).encode("utf-8-sig")
     return io.BytesIO(csv_bytes)
 
 
@@ -152,7 +152,7 @@ if st.button("Supprimer les doublons", type="primary"):
     base = os.path.splitext(uploaded_file.name)[0]
 
     if ext == ".csv":
-        out = export_csv(df_clean, sep=";")
+        out = export_csv(df_clean, sep=",")
         out_name = f"{base}_sans_doublons.csv"
         mime = "text/csv"
     else:

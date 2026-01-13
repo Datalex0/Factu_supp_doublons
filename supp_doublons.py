@@ -8,45 +8,72 @@ st.title("🧹 Suppression de doublons (XLSX / XLS / CSV)")
 
 uploaded_file = st.file_uploader("Charge un fichier (.xlsx, .xls, .csv)", type=["xlsx", "xls", "csv"])
 
+
+def try_read_csv(uploaded, encoding=None, sep=None):
+    uploaded.seek(0)
+    return pd.read_csv(
+        uploaded,
+        encoding=encoding,
+        sep=sep,
+        sep=None if sep == "AUTO" else sep,
+        engine="python" if (sep == "AUTO" or sep is None) else "c",
+    )
+
+
+def read_csv_robust(uploaded):
+    # On essaye d'abord auto-sep avec encodages courants en France
+    encodings_to_try = ["utf-8", "utf-8-sig", "cp1252", "latin1"]
+    seps_to_try = ["AUTO", ";", ",", "\t", "|"]
+
+    last_err = None
+    for enc in encodings_to_try:
+        for sep in seps_to_try:
+            try:
+                df = try_read_csv(uploaded, encoding=enc, sep=sep)
+                return df, enc, sep
+            except Exception as e:
+                last_err = e
+                continue
+
+    raise last_err
+
+
 def read_file(uploaded):
     name = uploaded.name.lower()
     ext = os.path.splitext(name)[1]
 
     if ext in [".xlsx", ".xls"]:
-        # Excel : on lit les feuilles pour proposer un choix
         xls = pd.ExcelFile(uploaded)
-        return ext, xls
-    elif ext == ".csv":
-        # CSV : on essaye quelques séparateurs courants
-        uploaded.seek(0)
-        try:
-            df = pd.read_csv(uploaded, sep=None, engine="python")  # auto-détection
-        except Exception:
-            uploaded.seek(0)
-            df = pd.read_csv(uploaded, sep=";")
-        return ext, df
-    else:
-        raise ValueError("Format non supporté.")
+        return ext, xls, None
+
+    if ext == ".csv":
+        df, enc, sep = read_csv_robust(uploaded)
+        return ext, df, {"encoding": enc, "sep": sep}
+
+    raise ValueError("Format non supporté.")
+
 
 def export_excel_single_sheet(df, sheet_name="Sheet1"):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name=sheet_name[:31])  # limite Excel 31 chars
+        df.to_excel(writer, index=False, sheet_name=sheet_name[:31])
     output.seek(0)
     return output
 
+
 def export_csv(df):
-    # UTF-8 avec BOM pour éviter les soucis d’accents dans Excel
+    # UTF-8 avec BOM pour ouverture clean dans Excel
     csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
     return io.BytesIO(csv_bytes)
+
 
 if uploaded_file is None:
     st.info("Charge un fichier pour commencer.")
     st.stop()
 
-# --- Lecture
+# --- Lecture principale
 try:
-    ext, obj = read_file(uploaded_file)
+    ext, obj, csv_meta = read_file(uploaded_file)
 except Exception as e:
     st.error(f"Impossible de lire le fichier : {e}")
     st.stop()
@@ -55,13 +82,27 @@ sheet_name = None
 if ext in [".xlsx", ".xls"]:
     xls = obj
     sheet_name = st.selectbox("Feuille à traiter", xls.sheet_names)
-    try:
-        df = pd.read_excel(xls, sheet_name=sheet_name)
-    except Exception as e:
-        st.error(f"Impossible de lire la feuille '{sheet_name}' : {e}")
-        st.stop()
+    df = pd.read_excel(xls, sheet_name=sheet_name)
 else:
     df = obj
+
+# Infos de lecture CSV
+if ext == ".csv" and csv_meta:
+    st.caption(f"CSV lu avec encoding **{csv_meta['encoding']}** et séparateur **{csv_meta['sep']}**")
+
+    # Option de relecture manuelle si l’auto a “mal deviné”
+    with st.expander("⚙️ Ajuster lecture CSV (si besoin)"):
+        enc_choice = st.selectbox("Encodage", ["utf-8", "utf-8-sig", "cp1252", "latin1"], index=["utf-8","utf-8-sig","cp1252","latin1"].index(csv_meta["encoding"]))
+        sep_choice = st.selectbox("Séparateur", ["AUTO", ";", ",", "\\t", "|"], index=["AUTO",";"," ,","\\t","|"].index(csv_meta["sep"]) if csv_meta["sep"] in ["AUTO",";","\\t","|"] else 0)
+
+        if st.button("Relire le CSV avec ces paramètres"):
+            sep_real = "\t" if sep_choice == "\\t" else sep_choice
+            try:
+                df = try_read_csv(uploaded_file, encoding=enc_choice, sep=sep_real)
+                st.success("CSV relu ✅")
+            except Exception as e:
+                st.error(f"Échec relecture : {e}")
+                st.stop()
 
 st.subheader("Aperçu")
 st.dataframe(df, use_container_width=True)
@@ -84,7 +125,6 @@ if dedup_scope == "Colonnes sélectionnées":
 
 keep = "first" if keep_mode == "Première occurrence" else "last"
 
-# Option utile quand on a des “faux doublons” (espaces, casse)
 with st.expander("Options avancées"):
     trim_strings = st.checkbox("Nettoyer les espaces (strip) sur les colonnes texte", value=False)
 
@@ -105,9 +145,6 @@ if st.button("Supprimer les doublons", type="primary"):
 
     base = os.path.splitext(uploaded_file.name)[0]
 
-    # --- Export dans le même "esprit" :
-    # CSV -> CSV
-    # XLS/XLSX -> XLSX (pandas exporte en xlsx via openpyxl)
     if ext == ".csv":
         out = export_csv(df_clean)
         out_name = f"{base}_sans_doublons.csv"

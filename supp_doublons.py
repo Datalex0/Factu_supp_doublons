@@ -140,7 +140,13 @@ if st.button("Supprimer les doublons", type="primary"):
     after = len(df_clean)
 
     st.success(f"✅ {before - after} doublon(s) supprimé(s).")
-    st.subheader("Aperçu du résultat")
+
+    colA, colB, colC = st.columns(3)
+    colA.metric("Lignes avant", before)
+    colB.metric("Lignes après", after)
+    colC.metric("Différence", before - after)
+
+    st.caption(f"Aperçu : {after} lignes dans le fichier nettoyé.")
     st.dataframe(df_clean, use_container_width=True)
 
     base = os.path.splitext(uploaded_file.name)[0]
@@ -160,4 +166,3 @@ if st.button("Supprimer les doublons", type="primary"):
         file_name=out_name,
         mime=mime,
     )
-

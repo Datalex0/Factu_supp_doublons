@@ -6,6 +6,18 @@ import streamlit as st
 st.set_page_config(page_title="Suppression de doublons", layout="wide")
 st.title("🧹 Suppression de doublons (XLSX / XLS / CSV)")
 
+with st.expander("⚠️ Avertissement / Limitation de responsabilité 😜", expanded=False):
+    st.markdown(
+        """
+        **Cette application est fournie “en l’état”.**  
+        En utilisant cette application, vous reconnaissez que :
+        - vous êtes responsable de vérifier les résultats avant toute utilisation,
+        - vous conservez une copie de sauvegarde de vos fichiers d’origine,
+        - l’éditeur décline toute responsabilité en cas de perte de données, d’erreur de traitement,
+          ou de tout dommage direct ou indirect lié à l’utilisation de l’application.
+        """
+    )
+
 uploaded_file = st.file_uploader("Charge un fichier (.xlsx, .xls, .csv)", type=["xlsx", "xls", "csv"])
 
 
@@ -166,3 +178,4 @@ if st.button("Supprimer les doublons", type="primary"):
         file_name=out_name,
         mime=mime,
     )
+

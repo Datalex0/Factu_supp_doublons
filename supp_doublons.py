@@ -139,16 +139,50 @@ keep = "first" if keep_mode == "Première occurrence" else "last"
 
 with st.expander("Options avancées"):
     trim_strings = st.checkbox("Nettoyer les espaces (strip) sur les colonnes texte", value=False)
+    case_insensitive = st.checkbox("Ignorer la casse (AZE = aze) pour la déduplication", value=True)
 
-df_work = df.copy()
-if trim_strings:
-    for c in df_work.columns:
-        if pd.api.types.is_string_dtype(df_work[c]):
-            df_work[c] = df_work[c].astype(str).str.strip()
+# df_work = df.copy()
+# if trim_strings:
+#     for c in df_work.columns:
+#         if pd.api.types.is_string_dtype(df_work[c]):
+#             df_work[c] = df_work[c].astype(str).str.strip()
+
+# if st.button("Supprimer les doublons", type="primary"):
+#     before = len(df_work)
+#     df_clean = df_work.drop_duplicates(subset=subset, keep=keep).reset_index(drop=True)
+def normalize_for_dedup(s: pd.Series, trim: bool, ci: bool) -> pd.Series:
+    # On ne touche pas aux données originales : on construit une clé de comparaison.
+    x = s
+
+    # On ne normalise que les colonnes "texte-like"
+    if pd.api.types.is_string_dtype(x) or x.dtype == "object":
+        x = x.astype(str)
+        if trim:
+            x = x.str.strip()
+        if ci:
+            # casefold() est plus robuste que lower() (accents, langues, etc.)
+            x = x.str.casefold()
+        return x
+
+    # Pour les autres types (numériques, dates, etc.), on garde tel quel
+    return x
+
 
 if st.button("Supprimer les doublons", type="primary"):
-    before = len(df_work)
-    df_clean = df_work.drop_duplicates(subset=subset, keep=keep).reset_index(drop=True)
+    before = len(df)
+
+    # Colonnes utilisées pour la déduplication
+    dedup_cols = list(df.columns) if subset is None else list(subset)
+
+    df_key = df.copy()
+
+    # Normalise uniquement les colonnes prises en compte
+    for c in dedup_cols:
+        df_key[c] = normalize_for_dedup(df_key[c], trim=trim_strings, ci=case_insensitive)
+
+    # Déduplication faite sur df_key (normalisé) mais on récupère les lignes originales depuis df
+    mask_keep = ~df_key.duplicated(subset=dedup_cols, keep=keep)
+    df_clean = df.loc[mask_keep].reset_index(drop=True)
     after = len(df_clean)
 
     st.success(f"✅ {before - after} doublon(s) supprimé(s).")
@@ -178,4 +212,5 @@ if st.button("Supprimer les doublons", type="primary"):
         file_name=out_name,
         mime=mime,
     )
+
 

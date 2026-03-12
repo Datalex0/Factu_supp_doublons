@@ -78,6 +78,36 @@ def export_csv(df, sep=";"):
     csv_bytes = df.to_csv(index=False, sep=sep).encode("utf-8-sig")
     return io.BytesIO(csv_bytes)
 
+def normalize_for_dedup(s: pd.Series, trim: bool, ci: bool) -> pd.Series:
+    # On ne touche pas aux données originales : on construit une clé de comparaison.
+    x = s
+
+    # On ne normalise que les colonnes "texte-like"
+    if pd.api.types.is_string_dtype(x) or x.dtype == "object":
+        x = x.astype(str)
+        if trim:
+            x = x.str.strip()
+        if ci:
+            # casefold() est plus robuste que lower() (accents, langues, etc.)
+            x = x.str.casefold()
+        return x
+
+    # Pour les autres types (numériques, dates, etc.), on garde tel quel
+    return x
+ 
+ 
+def highlight_duplicates(df, col):
+    """Retourne un DataFrame de styles : fond orange sur les lignes dupliquées."""
+    normalized = normalize_for_dedup(df[col].copy(), trim=True, ci=True)
+    is_dup = normalized.duplicated(keep=False)
+ 
+    def style_row(row):
+        if is_dup.iloc[row.name]:
+            return ["background-color: #FFDAB9; color: #8B2500"] * len(row)
+        return [""] * len(row)
+ 
+    return df.style.apply(style_row, axis=1)
+
 
 if uploaded_file is None:
     st.info("Charge un fichier pour commencer.")
@@ -119,6 +149,45 @@ if ext == ".csv" and csv_meta:
 st.subheader("Aperçu")
 st.dataframe(df, use_container_width=True)
 
+
+# ─────────────────────────────────────────────
+# SECTION : MISE EN ÉVIDENCE DES DOUBLONS
+# ─────────────────────────────────────────────
+st.markdown("---")
+st.subheader("🔍 Mise en évidence des doublons")
+ 
+col_highlight, col_btn = st.columns([3, 1])
+with col_highlight:
+    highlight_col = st.selectbox(
+        "Colonne à analyser",
+        options=list(df.columns),
+        key="highlight_col"
+    )
+with col_btn:
+    st.write("")  # espace pour aligner le bouton
+    st.write("")
+    run_highlight = st.button("🎨 Mettre en évidence", type="secondary")
+ 
+if run_highlight:
+    normalized = normalize_for_dedup(df[highlight_col].copy(), trim=True, ci=True)
+    is_dup = normalized.duplicated(keep=False)
+    nb_dup_rows = is_dup.sum()
+    nb_dup_vals = normalized[is_dup].nunique()
+ 
+    if nb_dup_rows == 0:
+        st.success(f"✅ Aucun doublon trouvé dans la colonne **{highlight_col}**.")
+    else:
+        st.warning(
+            f"⚠️ **{nb_dup_rows} ligne(s)** concernées par des doublons "
+            f"({nb_dup_vals} valeur(s) en double) dans la colonne **{highlight_col}**."
+        )
+        styled = highlight_duplicates(df, highlight_col)
+        st.dataframe(styled, use_container_width=True)
+
+
+# ─────────────────────────────────────────────
+# SECTION : DÉDUPLICATION
+# ─────────────────────────────────────────────
 st.markdown("---")
 st.subheader("Paramètres de déduplication")
 
@@ -141,31 +210,8 @@ with st.expander("Options avancées"):
     trim_strings = st.checkbox("Nettoyer les espaces (strip) sur les colonnes texte", value=False)
     case_insensitive = st.checkbox("Ignorer la casse (AZE = aze) pour la déduplication", value=True)
 
-# df_work = df.copy()
-# if trim_strings:
-#     for c in df_work.columns:
-#         if pd.api.types.is_string_dtype(df_work[c]):
-#             df_work[c] = df_work[c].astype(str).str.strip()
 
-# if st.button("Supprimer les doublons", type="primary"):
-#     before = len(df_work)
-#     df_clean = df_work.drop_duplicates(subset=subset, keep=keep).reset_index(drop=True)
-def normalize_for_dedup(s: pd.Series, trim: bool, ci: bool) -> pd.Series:
-    # On ne touche pas aux données originales : on construit une clé de comparaison.
-    x = s
 
-    # On ne normalise que les colonnes "texte-like"
-    if pd.api.types.is_string_dtype(x) or x.dtype == "object":
-        x = x.astype(str)
-        if trim:
-            x = x.str.strip()
-        if ci:
-            # casefold() est plus robuste que lower() (accents, langues, etc.)
-            x = x.str.casefold()
-        return x
-
-    # Pour les autres types (numériques, dates, etc.), on garde tel quel
-    return x
 
 
 if st.button("Supprimer les doublons", type="primary"):
